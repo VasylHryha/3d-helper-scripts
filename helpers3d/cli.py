@@ -23,8 +23,8 @@ def _params(pairs: List[str]) -> Dict[str, Any]:
 
 def _plan_from_args(args) -> tripo.Plan:
     views = {v: Path(getattr(args, v)) for v in tripo.VIEW_ORDER if getattr(args, v)}
-    return tripo.build_plan(args.credits, args.prompt or "", Path(args.image) if args.image else None,
-                            views or None, _params(args.param))
+    return tripo.build_plan(args.credits, args.model or "", args.prompt or "", Path(args.image) if args.image else None,
+                            views or None, args.source_task or "", _params(args.param))
 
 
 def _make_confirm(confirm_credits: Optional[int]):
@@ -49,9 +49,22 @@ def cmd_tripo(args) -> int:
     if args.action == "balance":
         print(json.dumps(client.balance()))
         return 0
-    model = tripo.execute(plan, client, _make_confirm(args.confirm_credits), Path(args.out), args.name,
-                          config.credit_log_path(), args.license,
-                          on_progress=lambda info: print("  status %s %s%%" % (info.get("status"), info.get("progress", "?"))))
+
+    def show(info):
+        print("  status %s %s%%" % (info.get("status"), info.get("progress", "?")))
+
+    if args.action == "fetch":
+        if not args.task:
+            raise tripo.TripoError("fetch needs --task TASK_ID.")
+        model = tripo.collect(client, args.task, Path(args.out), args.name, config.credit_log_path(), args.license,
+                              on_progress=show)
+    else:
+        def created(task_id):
+            print("Task created: %s\nIf this run stops early, get the model back with:\n  python3 -m helpers3d tripo "
+                  "fetch --task %s --out %s --name %s" % (task_id, task_id, args.out, args.name))
+
+        model = tripo.execute(plan, client, _make_confirm(args.confirm_credits), Path(args.out), args.name,
+                              config.credit_log_path(), args.license, on_progress=show, on_created=created)
     print("Saved %s" % model)
     return 0
 
@@ -87,7 +100,10 @@ def cmd_check(args) -> int:
 def cmd_convert(args) -> int:
     extra = ["--height", str(args.height)] if args.height else []
     extra += ["--ground"] if args.ground else []
-    return _builtin("convert.py", ["--model", args.model, "--out", args.out] + extra)
+    code = _builtin("convert.py", ["--model", args.model, "--out", args.out] + extra)
+    if code == 0:
+        provenance.write_derived_record(Path(args.model), Path(args.out), "convert" + (" " + " ".join(extra) if extra else ""))
+    return code
 
 
 def cmd_sheet(args) -> int:
@@ -114,9 +130,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="h3d", description="Tripo and Blender helper scripts.")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    tr = sub.add_parser("tripo", help="plan (free dry run), balance, or run (spends credits after confirm)")
-    tr.add_argument("action", choices=["plan", "balance", "run"])
+    tr = sub.add_parser("tripo", help="plan (free dry run), balance, run (spends credits after confirm), "
+                                      "or fetch a task you already started")
+    tr.add_argument("action", choices=["plan", "balance", "run", "fetch"])
     tr.add_argument("--credits", type=int, default=0, help="credits you expect this to cost (plan, run)")
+    tr.add_argument("--model", help="Tripo model version, required for generation (for example v3.1-20260211)")
+    tr.add_argument("--source-task", help="retexture: id of an earlier Tripo task whose model gets new textures")
+    tr.add_argument("--task", help="fetch: id of the task to collect")
     tr.add_argument("--prompt")
     tr.add_argument("--image")
     for view in tripo.VIEW_ORDER:

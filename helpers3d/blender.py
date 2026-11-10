@@ -44,7 +44,9 @@ def find_blender(platform: Optional[str] = None, env: Optional[Mapping[str, str]
     home = home or str(Path.home())
     explicit = env.get("BLENDER_BIN")
     if explicit:
-        return explicit if Path(explicit).is_file() else None
+        if not Path(explicit).is_file():
+            raise FileNotFoundError("BLENDER_BIN points to a file that does not exist: %s" % explicit)
+        return explicit
     found = which("blender")
     if found:
         return found
@@ -62,5 +64,7 @@ def run_script(script: Path, args: Sequence[str] = (), blender: Optional[str] = 
     blender = blender or find_blender()
     if not blender:
         raise FileNotFoundError("Blender not found. Install it or set BLENDER_BIN to its executable.")
-    command = [blender, "--background", "--factory-startup", "--python", str(script), "--"] + [str(a) for a in args]
+    # --python-exit-code makes a Python error in the script a non-zero exit instead of a silent 0.
+    command = [blender, "--background", "--factory-startup", "--python-exit-code", "1",
+               "--python", str(script), "--"] + [str(a) for a in args]
     return subprocess.run(command, timeout=timeout).returncode

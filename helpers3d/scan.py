@@ -62,10 +62,14 @@ def scan_repo(root: Path, staged: bool = False) -> List[Finding]:
     terms = load_terms(root)
     findings: List[Finding] = []
     for name in git_files(root, staged):
-        path = root / name
         try:
-            text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+            if staged:  # what will be committed, not what is on disk now
+                raw = subprocess.run(["git", "-C", str(root), "show", ":" + name], capture_output=True,
+                                     check=True).stdout
+                text = raw.decode("utf-8")
+            else:
+                text = (root / name).read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError, subprocess.CalledProcessError):
             continue
         findings += scan_text(name, text, terms)
     return findings

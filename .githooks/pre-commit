@@ -1,3 +1,10 @@
 #!/bin/sh
 # Blocks a commit that contains a key, a private path or a local deny-term.
-exec python3 -m helpers3d scan --staged
+# Works with whichever Python launcher the machine has (python3 on macOS/Linux, python or py on Windows).
+for launcher in python3 python py; do
+    if command -v "$launcher" >/dev/null 2>&1; then
+        exec "$launcher" -m helpers3d scan --staged
+    fi
+done
+echo "pre-commit: no Python found (tried python3, python, py)" >&2
+exit 1

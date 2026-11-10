@@ -28,7 +28,8 @@ class FindBlenderTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile() as fake:
             self.assertEqual(blender.find_blender(env={"BLENDER_BIN": fake.name}, which=lambda n: "/x/blender"),
                              fake.name)
-        self.assertIsNone(blender.find_blender(env={"BLENDER_BIN": "/missing"}, which=lambda n: "/x/blender"))
+        with self.assertRaises(FileNotFoundError):
+            blender.find_blender(env={"BLENDER_BIN": "/missing"}, which=lambda n: "/x/blender")
 
     def test_nothing_found(self):
         self.assertIsNone(blender.find_blender(platform="linux", env={}, home="/h", which=lambda n: None,
@@ -57,6 +58,16 @@ class ProvenanceTests(unittest.TestCase):
             self.assertEqual(provenance.verify_record(asset), "ok")
             asset.write_bytes(b"two")
             self.assertEqual(provenance.verify_record(asset), "changed")
+
+    def test_converted_file_keeps_licence_and_links_source_hash(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source, derived = Path(folder) / "a.glb", Path(folder) / "b.fbx"
+            source.write_bytes(b"src")
+            derived.write_bytes(b"out")
+            provenance.write_record(source, "Tripo API", "3d-helper-scripts", "my licence", task_id="t1")
+            record = json.loads(provenance.write_derived_record(source, derived, "convert").read_text())
+            self.assertEqual((record["license"], record["task_id"]), ("my licence", "t1"))
+            self.assertEqual(record["derived_from"], {"file": "a.glb", "sha256": provenance.sha256_of(source)})
 
 
 if __name__ == "__main__":

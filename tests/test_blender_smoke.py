@@ -29,6 +29,12 @@ class BlenderSmokeTests(unittest.TestCase):
     def run_builtin(self, name, args):
         return blender.run_script(blender.scripts_dir() / name, args, timeout=300)
 
+    def test_a_failing_script_gives_a_non_zero_exit_code(self):
+        with tempfile.TemporaryDirectory() as folder:
+            code = self.run_builtin("mesh_check.py", ["--model", str(Path(folder) / "missing.glb"),
+                                                      "--json", str(Path(folder) / "r.json")])
+            self.assertNotEqual(code, 0)
+
     def test_check_convert_views_and_sheet(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
