@@ -1,0 +1,3 @@
+#!/bin/sh
+# Blocks a commit that contains a key, a private path or a local deny-term.
+exec python3 -m helpers3d scan --staged

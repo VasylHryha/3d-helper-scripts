@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "3d-helper-scripts"
+version = "0.1.0"
+description = "Cross-platform helper scripts for Tripo (3D generation API) and headless Blender."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+h3d = "helpers3d.cli:main"
+
+[tool.setuptools]
+packages = ["helpers3d", "helpers3d.blender_scripts"]
+
+[tool.setuptools.package-data]
+"helpers3d.blender_scripts" = ["*.py"]
